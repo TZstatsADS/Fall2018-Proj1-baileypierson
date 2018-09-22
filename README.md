@@ -1,28 +1,18 @@
 # Applied Data Science @ Columbia
 ## Fall 2018
-## Project 1: What made you happy today?
-
-![image](figs/title.jpeg)
+## Bailey Pierson (bp2471)
+## Project 1: Do we really enjoy spending time with our family?
 
 ### [Project Description](doc/)
-This is the first and only *individual* (as opposed to *team*) this semester. 
-
-Term: Fall 2018
-
-+ Projec title: Lorem ipsum dolor sit amet
-+ This project is conducted by [your name]
-
-+ Project summary: [a short summary] Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
+Using the provided scripts for processing the HappyDB data, I investigated how prevalent "family-oriented" moments are, the categories of these moments, who experiences these moments, and whether or not certain family members were greater sources of happiness than others. The directory structure of this project is slightly modified, and is formatted as follows:
 
 ```
 proj/
-├── lib/
 ├── data/
 ├── doc/
 ├── figs/
-└── output/
+
+
 ```
 
 Please see each subfolder for a README file.

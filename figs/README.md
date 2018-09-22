@@ -1,4 +1,5 @@
-# ADS Project 1: What made you happy today?
-### Figs folder
+# ADS Project 1
+### Code figs Folder
 
-The figs directory contains the figures. This directory only contains generated files; that is, one should always be able to delete the contents and regenerate them.
+This folder conatins all generated graphics in .jpeg format.
+

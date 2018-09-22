@@ -1,0 +1,164 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#####Applied Data Science: Project 1
+#####Bailey Pierson (bp2471)
+
+
+##Do we *really* enjoy spending time with our family?
+####While somewhat pessimistic, time spent with family has its ups and downs, and a general societal pressure to publically assert familial affection might obscure the day-to-day realities of family relationships. HappyDB, a corpus of 100,000 crowd-sourced happy moments, provides a unique opportunity to investigate wether family members really are a common source of day-to-day happy moments.
+
+```{r packages, warning=FALSE, message=FALSE, include=FALSE}
+#install neccesary packages
+library(tidytext)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+```
+
+```{r warning=FALSE, message=FALSE, include=FALSE}
+#load in datasets 
+text_data <- read.csv("../data/processed_moments.csv", stringsAsFactors = F)
+topic_data <- readLines("../data/family-dict.csv") #read in provided list of family words
+demo_data <-read.csv("../data/demographic.csv")
+food_data <- readLines("../data/food-dict.csv")
+
+## join datasets and add flag on presence of family word
+text_data <- text_data %>% 
+  inner_join(demo_data, by="wid") %>% 
+  mutate(is_fam = text %like% paste(topic_data, sep="_", collapse = "|"), is_food = text %like% paste(food_data, sep="_", collapse = "|")) %>%
+  filter(!text %like% c("person|song|reason")) 
+
+#filter food topics
+food_data <- text_data %>%
+  filter(is_food == T)
+
+#calculate sentiment score using join with AFINN lexicon
+sentiment <- get_sentiments("afinn")
+
+text_sentiment <- text_data %>%
+  unnest_tokens(word, text) %>%
+  inner_join(sentiment) %>%
+  group_by(hmid) %>%
+  mutate(sent_score = mean(score)) %>%
+  select(-score, -id, -word)
+
+#make distinct family-oriented dataset and add column for mentioned family member
+fam_sentiment <- text_sentiment %>%
+  filter(is_fam == T) %>%
+  mutate(relative = case_when(
+           cleaned_hm %like% "son|son-in-law|sons" ~ "son",
+           cleaned_hm %like% "dad|daddy|dads|father|father-in-law|fathers" ~ "dad", 
+           cleaned_hm %like%  "mama|mom|momma|mommies|mommy|moms|mother|mothers|mum|mummy|mums" ~ "mom", 
+           cleaned_hm %like% "daughter|daughter-in-law|daughters" ~ "daughter", 
+           cleaned_hm %like% "fiance|fiancee|hubby|husband|ex-husband|ex-wife|wife|husbands|wives|boyfriends|spouses|spouse" ~ "spouse"))
+
+```
+####How do we measure family-orientation?
+In order to investigate the presence of family-related moments in the HappyDB data set, I used a supplementary file `family_dict.csv` provided by the corpus authors. This file included 150 family member nouns, such as "aunt" "daughter" or "sister-in-law", which were all present within the corpus. Family-oriented is operationalized as the presence of at least one of these nouns in the moment text.
+
+Overall **`r round((nrow(fam_sentiment) / nrow(text_sentiment)) * 100, 2)`% of moments can be considered family-oriented** by this measure, which is fortunately larger than the `r round((nrow(food_data) / nrow(text_data)) * 100, 2)`% moments which mention food of any variety. 
+
+####What are family oriented-moments about?
+The HappyDB corpus contains a moment attribute called predicted category, which includes labels like "achievement" or "nature" that speak to the general theme of a moment. The graph below shows the distribution of family-oriented moments across these themes, with an additional chart appended that shows the percentage of family-oriented moments in each theme. **Family-oriented moments make up the vast majority of affection-themed moments** and are not very commonly attributed to an exercise, leisure, or nature theme.
+
+```{r fig.align="center", echo = FALSE}
+ggplot(text_sentiment, aes(predicted_category, fill = is_fam)) + 
+  geom_bar() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(fill = "Family Oriented", x = "Moment Theme", title = "Distribution of Family \nOriented Moments and Theme")
+
+#helper functions for percentage calculations
+div_text <- function(x){
+  (x/nrow(text_sentiment)) *100
+}
+div_fam <- function(x){
+  (x/nrow(fam_sentiment)) *100
+}
+
+#summary stats for category
+sapply(summary(as.factor(fam_sentiment$predicted_category)), div_fam)
+
+```
+
+####Are family moments happier than average moments?
+In order to develop a rough understanding of if these affective family moments are truly happy moments, I computed a sentiment score for each moment in the HappyDB data set using the AFINN lexicon. The AFINN lexicon has an integer scale of -5 to 5, with the most negative uni-grams assigned a score of -5 and the most positive being assigned a score of 5. The ultimate sentiment score for each moment is the mean of the AFINN score for each word in the moment text. The graph below shows how the AFINN lexicon's use of integers, and the averaging of uni-gram scores, results in a sentiment score distribution with many local modes. However, it is important to note that an overall larger percentage of family-oriented moments are found above the global mode---**family-oriented moments are happier than the dataset average**. In addition, a Kruskal-Wallis test of independence shows that we can confidently reject the null hypothesis of family-oriented and non-family-oriented moments have the same sentiment score distribution (with p-value of `r kruskal.test(sent_score ~ is_fam, text_sentiment)$p.value`).
+```{r fig.align="center", echo = FALSE}
+ggplot(text_sentiment, aes(sent_score, fill = is_fam)) +
+  geom_density(alpha = 0.7) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(fill = "Family Oriented", x = "Sentiment Score", title = "Distribution of Family \nOriented Moments over \nSentiment Score")
+```
+
+####Who experiences family-oriented happy moments?
+Knowing that family-oriented moments are significantly happier than average, we might wonder *who* exactly is experiencing these kind of moments. The graphs below paint a clear picture---**married women who are parents experience a disproportional amount of family-oriented moments**.
+```{r fig.align="center", echo = FALSE}
+relative_sentiment <- text_sentiment %>%
+  mutate(relative = case_when(
+    cleaned_hm %like% "son" ~ "son",
+    cleaned_hm %like% "dad|daddy|dads|father|father-in-law|fathers" ~ "dad", 
+    cleaned_hm %like%  "mama|mom|momma|mommies|mommy|moms|mother|mothers|mum|mummy|mums" ~ "mom", 
+    cleaned_hm %like% "daughter|daughter-in-law|daughters" ~ "daughter", 
+    cleaned_hm %like% "fiance|fiancee|hubby|husband|ex-husband|ex-wife|wife|husbands|wives|boyfriends|spouses|spouse" ~ "spouse"),
+    is_mom = case_when(
+      gender == "f" & parenthood == "y" & marital == "married" ~ "is_Mother",
+      TRUE ~ "Other"
+    ))
+
+ggplot(relative_sentiment, aes(is_mom, fill = is_fam)) + 
+  geom_bar(position = "dodge") +
+  theme(plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust = 0.5)) +
+  labs(fill = "Family Oriented", x = "Married Mother", title = "Distribution of Family \nOriented Moments and Married Mother Status")
+```
+
+In addition, the graphs below provide greater context to how each identity (gender, marital status, and parenthood status) contributes to the unique case of married mothers.
+
+<div class = "row">
+<div class = "col-md-4">
+```{r fig.align="center", echo = FALSE}
+ggplot(text_sentiment, aes(gender, fill = is_fam)) + 
+  geom_bar(position = 'dodge') +
+  theme(plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust = 0.5)) +
+  labs(caption = "'f' represents Female, 'm' represents Male, 'o' represents Other", fill = "Family Oriented", x = "Gender", title = "Distribution of Family \nOriented Moments and Gender")
+```
+</div>
+
+<div class = "row">
+<div class = "col-md-4">
+```{r fig.align="center", echo = FALSE}
+ggplot(text_sentiment, aes(marital, fill = is_fam)) + 
+  geom_bar(position = 'dodge') +
+  theme(plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust = 0.5)) +
+  labs(fill = "Family Oriented", x = "Gender", title = "Distribution of Family \nOriented Moments and Marital Status")
+```
+</div>
+
+<div class = "row">
+<div class = "col-md-4">
+```{r fig.align="center", echo = FALSE}
+ggplot(text_sentiment, aes(parenthood, fill = is_fam)) + 
+  geom_bar(position = 'dodge') +
+  theme(plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust = 0.5)) +
+  labs(caption = "'n' represents Not a Parent, 'y' represents a Parent", fill = "Family Oriented", x = "Parenthood Status", title = "Distribution of Family \nOriented Moments and Parenthood")
+```
+</div>
+
+###Who makes Mom happiest?
+Now that we've discovered a somewhat comforting finding---your Mother probably enjoys the company of at least one of your family members---we have to dig a bit deeper. *Do you make your Mom happy?* The histogram below, which shows the distribution of sentiment score of family-oriented moments contributed by mothers, grouped by the relative mentioned in the moment, may confirm what some of us already know; **mothers do not play favorites**. There is no significant difference in the average sentiment score associated with each immediate family member, or in relation to non-immediate family members (coded as "NA"). 
+
+```{r fig.align="center", echo = FALSE}
+relative_sentiment %>%
+  filter(is_mom == "is_Mother") %>%
+  ggplot(., aes(relative, sent_score)) +
+  geom_boxplot() +
+  theme(plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust = 0.5)) +
+  labs(x = "Relative Mentioned", y= "Average Sentiment Score", title = "Distribution of Mother's Family-\nOriented Moments and Relative")
+
+```
